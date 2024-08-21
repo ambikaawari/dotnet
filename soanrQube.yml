@@ -1,0 +1,76 @@
+# ASP.NET Core (.NET Framework)
+# Build and test ASP.NET Core projects targeting the full .NET Framework.
+# Add steps that publish symbols, save build artifacts, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+
+trigger:
+- main
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  solution: '**/*.sln'
+  buildPlatform: 'Any CPU'
+  buildConfiguration: 'Release'
+
+jobs:
+  - job: Build
+    
+    steps:
+    - task: NuGetToolInstaller@1
+
+    - task: NuGetCommand@2
+      inputs:
+        restoreSolution: '$(solution)'
+    
+    - task: SonarQubePrepare@5
+      inputs:
+        SonarQube: 'sonarQube'
+        scannerMode: 'MSBuild'
+        projectKey: 'TestDemo_Net-web-app.git'
+        projectName: 'TestDemo_Net-web-app'
+    
+    - task: VSBuild@1
+      inputs:
+        solution: '$(solution)'
+        msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:DesktopBuildPackageLocation="$(build.artifactStagingDirectory)\WebApp.zip" /p:DeployIisAppPath="Default Web Site"'
+        platform: '$(buildPlatform)'
+        configuration: '$(buildConfiguration)'
+    
+    - task: SonarQubeAnalyze@5
+    
+    - task: SonarQubePublish@5
+      inputs:
+        pollingTimeoutSec: '300'
+
+    - task: VSTest@2
+      inputs:
+        platform: '$(buildPlatform)'
+        configuration: '$(buildConfiguration)'
+
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: 'publish'
+        publishWebProjects: true
+  
+  # - job: waitingapproval
+  #   dependsOn: Build
+  #   pool: Server
+  #   timeoutInMinutes: 30000
+  #   steps:
+  #     - task: ManualValidation@0
+  #       inputs:
+  #         notifyUsers: 'ambika.awari@gmail.com'
+  #         instructions: 'check sonar dashboard'
+
+  # - job: deploy
+  #   dependsOn: waitingapproval
+  #   steps:
+  #   - task: AzureWebApp@1
+  #     inputs:
+  #       azureSubscription: 'Visual Studio Enterprise Subscription – MPN(20bac492-273c-4d6e-81a6-c451996ee342)'
+  #       appType: 'webApp'
+  #       appName: 'app2'
+  #       package: '$(System.DefaultWorkingDirectory)/**/*.zip'
+  #       deploymentMethod: 'auto'
